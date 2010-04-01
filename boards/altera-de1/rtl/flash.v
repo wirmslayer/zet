@@ -44,7 +44,7 @@ module flash (
   wire        opbase;
   wire        word;
   wire        op_word;
-  reg         st;
+  reg  [ 1:0] st;
   reg  [ 7:0] lb;
   reg  [11:0] base;
 
@@ -63,20 +63,20 @@ module flash (
     wb_tga_i ? { 1'b1, base, wb_adr_i[8:1] }
              : { 5'h0, wb_adr_i };
 
-  assign flash_addr_[0] = (wb_sel_i==2'b10) | (word & st);
+  assign flash_addr_[0] = (wb_sel_i==2'b10) | (word & st[1]);
 
-  assign wb_ack_o = op & (word ? st : 1'b1);
+  assign wb_ack_o = op & st[0] & (word ? st[1] : 1'b1);
   assign wb_dat_o = wb_sel_i[1] ? { flash_data_, lb }
                                 : { 8'h0, flash_data_ };
 
   // Behaviour
   // st - state
   always @(posedge wb_clk_i)
-    st <= wb_rst_i ? 1'b0 : op_word;
+    st <= wb_rst_i ? 2'b00 : ((op & !wb_ack_o) ? st + 2'b01 : 2'b00);
 
   // lb - low byte
   always @(posedge wb_clk_i)
-    lb <= wb_rst_i ? 8'h0 : (op_word ? flash_data_ : 8'h0);
+    lb <= wb_rst_i ? 8'h0 : ((op_word & st[0]) ? flash_data_ : 8'h0);
 
   // base
   always @(posedge wb_clk_i)
